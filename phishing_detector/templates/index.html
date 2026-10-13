@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛡️ Phishing Detector — URL Threat Analyzer</title>
+<style>
+  :root {
+    --bg:        #1a1a2e;
+    --surface:   #16213e;
+    --card:      #0f3460;
+    --accent:    #e94560;
+    --green:     #00e676;
+    --yellow:    #ffea00;
+    --orange:    #ff9100;
+    --red:       #ff1744;
+    --text:      #e0e0e0;
+    --dim:       #8899aa;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── header ─────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    padding: 1.2rem 2rem;
+    display: flex; align-items: center; gap: 1rem;
+    border-bottom: 2px solid var(--accent);
+  }
+  header h1 { font-size: 1.4rem; }
+  header span { color: var(--dim); font-size: .85rem; }
+
+  /* ── search bar ─────────────────────────────────── */
+  .search-section {
+    max-width: 800px; margin: 2.5rem auto; padding: 0 1rem;
+  }
+  .search-bar {
+    display: flex; gap: .5rem;
+  }
+  .search-bar input[type=text] {
+    flex: 1; padding: .8rem 1rem; border-radius: 8px;
+    border: 1px solid #334; background: var(--surface);
+    color: #fff; font-size: 1rem; outline: none;
+  }
+  .search-bar input:focus { border-color: var(--accent); }
+  .search-bar button {
+    padding: .8rem 1.6rem; border-radius: 8px; border: none;
+    background: var(--accent); color: #fff; font-weight: 700;
+    cursor: pointer; font-size: 1rem; transition: .2s;
+  }
+  .search-bar button:hover { filter: brightness(1.15); }
+
+  /* ── demo buttons ───────────────────────────────── */
+  .demos {
+    margin-top: .8rem; display: flex; flex-wrap: wrap; gap: .5rem;
+  }
+  .demos button {
+    padding: .35rem .8rem; border-radius: 6px; border: 1px solid #445;
+    background: transparent; color: var(--dim); cursor: pointer;
+    font-size: .78rem; transition: .2s;
+  }
+  .demos button:hover { border-color: var(--accent); color: #fff; }
+
+  /* ── API key row ────────────────────────────────── */
+  .api-row {
+    margin-top: .6rem; display: flex; gap: .5rem; align-items: center;
+  }
+  .api-row input {
+    flex: 1; padding: .5rem .8rem; border-radius: 6px;
+    border: 1px solid #334; background: var(--surface);
+    color: #fff; font-size: .85rem; outline: none;
+  }
+  .api-row label { color: var(--dim); font-size: .82rem; white-space: nowrap; }
+
+  /* ── results ────────────────────────────────────── */
+  #results { max-width: 900px; margin: 2rem auto; padding: 0 1rem; display: none; }
+
+  .score-card {
+    background: var(--surface); border-radius: 12px; padding: 2rem;
+    display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
+    border: 1px solid #334;
+  }
+
+  /* donut */
+  .donut-wrap { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
+  .donut-wrap canvas { width: 140px; height: 140px; }
+  .donut-label {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .donut-label .pct { font-size: 1.8rem; font-weight: 800; }
+  .donut-label .sub { font-size: .7rem; color: var(--dim); }
+
+  .meta { flex: 1; min-width: 200px; }
+  .meta .verdict { font-size: 1.3rem; font-weight: 700; margin-bottom: .4rem; }
+  .meta .ratio   { font-size: .95rem; color: var(--dim); }
+  .meta .source  { font-size: .8rem; color: var(--dim); margin-top: .3rem; }
+
+  /* summary strip */
+  .summary-strip {
+    display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;
+  }
+  .summary-strip .chip {
+    padding: .3rem .9rem; border-radius: 20px; font-size: .82rem; font-weight: 600;
+  }
+  .chip-mal  { background: rgba(255,23,68,.18); color: var(--red); }
+  .chip-sus  { background: rgba(255,234,0,.13); color: var(--yellow); }
+  .chip-cln  { background: rgba(0,230,118,.13); color: var(--green); }
+  .chip-und  { background: rgba(136,153,170,.13); color: var(--dim); }
+
+  /* indicators */
+  .indicators {
+    background: var(--surface); border-radius: 10px; padding: 1.2rem;
+    margin-top: 1.2rem; border: 1px solid #334;
+  }
+  .indicators h3 { margin-bottom: .7rem; font-size: 1rem; }
+  .indicators li {
+    list-style: none; padding: .35rem 0; border-bottom: 1px solid #223;
+    font-size: .9rem;
+  }
+
+  /* vendor table */
+  .vendor-section {
+    margin-top: 1.2rem;
+  }
+  .filter-row {
+    display: flex; gap: .5rem; margin-bottom: .6rem; flex-wrap: wrap;
+  }
+  .filter-row button {
+    padding: .3rem .7rem; border-radius: 6px; border: 1px solid #445;
+    background: transparent; color: var(--dim); cursor: pointer; font-size: .78rem;
+  }
+  .filter-row button.active { border-color: var(--accent); color: #fff; }
+
+  .vendor-table {
+    width: 100%; border-collapse: collapse;
+    background: var(--surface); border-radius: 10px; overflow: hidden;
+  }
+  .vendor-table th {
+    text-align: left; padding: .6rem .8rem; background: var(--card);
+    font-size: .82rem; color: var(--dim);
+  }
+  .vendor-table td { padding: .5rem .8rem; border-bottom: 1px solid #223; font-size: .85rem; }
+  .vendor-table tr:hover { background: rgba(233,69,96,.06); }
+  .st-mal { color: var(--red); font-weight: 700; }
+  .st-sus { color: var(--yellow); font-weight: 600; }
+  .st-cln { color: var(--green); }
+  .st-und { color: var(--dim); }
+
+  /* spinner */
+  .spinner { display: none; text-align: center; margin: 2rem; }
+  .spinner .dot {
+    display: inline-block; width: 12px; height: 12px; margin: 0 4px;
+    border-radius: 50%; background: var(--accent);
+    animation: bounce .6s infinite alternate;
+  }
+  .spinner .dot:nth-child(2) { animation-delay: .2s; }
+  .spinner .dot:nth-child(3) { animation-delay: .4s; }
+  @keyframes bounce { to { transform: translateY(-14px); opacity: .4; } }
+
+  footer { text-align: center; color: var(--dim); font-size: .75rem; padding: 2rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛡️ Phishing Detector</h1>
+  <span>URL Threat & Risk Analyzer — 72 Security Engines</span>
+</header>
+
+<section class="search-section">
+  <div class="search-bar">
+    <input type="text" id="urlInput" placeholder="Enter URL to scan…  e.g. http://paypal-secure.xyz/login" autofocus>
+    <button onclick="doScan()">🔍 Scan</button>
+  </div>
+
+  <div class="demos">
+    <span style="color:var(--dim);font-size:.8rem;">Try:</span>
+    <button onclick="fillDemo('http://paypal-security-update.xyz/login/verify.php')">PayPal Phish</button>
+    <button onclick="fillDemo('http://192.168.1.1/admin/login')">IP Login</button>
+    <button onclick="fillDemo('https://g00gle-verify.tk/account')">Google Spoof</button>
+    <button onclick="fillDemo('https://bit.ly/3xFake')">Shortener</button>
+    <button onclick="fillDemo('https://www.google.com')">Safe: Google</button>
+    <button onclick="fillDemo('https://github.com')">Safe: GitHub</button>
+  </div>
+
+  <div class="api-row">
+    <label>🔑 VT API Key (optional):</label>
+    <input type="text" id="apiKeyInput" placeholder="Paste VirusTotal API v3 key for live scan…">
+  </div>
+</section>
+
+<div class="spinner" id="spinner"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+
+<section id="results">
+  <div class="score-card">
+    <div class="donut-wrap">
+      <canvas id="donutChart" width="140" height="140"></canvas>
+      <div class="donut-label">
+        <div class="pct" id="pctLabel">0%</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="verdict" id="verdictLabel"></div>
+      <div class="ratio" id="ratioLabel"></div>
+      <div class="source" id="sourceLabel"></div>
+      <div class="summary-strip" id="summaryStrip"></div>
+    </div>
+  </div>
+
+  <div class="indicators">
+    <h3>🔍 Threat Indicators</h3>
+    <ul id="indicatorList"></ul>
+  </div>
+
+  <div class="vendor-section">
+    <h3 style="margin-bottom:.5rem;">🏢 Security Vendors (72 Engines)</h3>
+    <div class="filter-row" id="filterRow">
+      <button class="active" data-f="all">All</button>
+      <button data-f="Malicious">Malicious</button>
+      <button data-f="Suspicious">Suspicious</button>
+      <button data-f="Clean">Clean</button>
+      <button data-f="Undetected">Undetected</button>
+    </div>
+    <table class="vendor-table">
+      <thead><tr><th>#</th><th>Vendor</th><th>Category</th><th>Status</th></tr></thead>
+      <tbody id="vendorBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer>Phishing Detector — Educational / Research Tool &bull; Not affiliated with VirusTotal</footer>
+
+<script>
+let allVendors = [];
+
+function fillDemo(url) { document.getElementById('urlInput').value = url; doScan(); }
+
+async function doScan() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('spinner').style.display = 'block';
+
+  try {
+    const resp = await fetch('/api/scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url, api_key: apiKey}),
+    });
+    const data = await resp.json();
+    render(data);
+  } catch (e) {
+    alert('Scan failed: ' + e.message);
+  } finally {
+    document.getElementById('spinner').style.display = 'none';
+  }
+}
+
+function scoreColor(s) {
+  if (s <= 14) return '#00e676';
+  if (s <= 34) return '#ffea00';
+  if (s <= 64) return '#ff9100';
+  return '#ff1744';
+}
+
+function drawDonut(score) {
+  const canvas = document.getElementById('donutChart');
+  const ctx = canvas.getContext('2d');
+  const cx = 70, cy = 70, r = 56, lw = 14;
+  ctx.clearRect(0, 0, 140, 140);
+  // bg ring
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.strokeStyle = '#223'; ctx.lineWidth = lw; ctx.stroke();
+  // score arc
+  const angle = (score / 100) * Math.PI * 2;
+  ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + angle);
+  ctx.strokeStyle = scoreColor(score); ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.stroke();
+}
+
+function render(d) {
+  drawDonut(d.risk_score);
+  document.getElementById('pctLabel').textContent = d.risk_score + '%';
+  document.getElementById('pctLabel').style.color = scoreColor(d.risk_score);
+  document.getElementById('verdictLabel').textContent = d.risk_level;
+  document.getElementById('verdictLabel').style.color = scoreColor(d.risk_score);
+  document.getElementById('ratioLabel').textContent =
+    d.detection_ratio + ' security vendors flagged this URL';
+  document.getElementById('sourceLabel').textContent = '📡 ' + d.source;
+
+  // summary
+  const strip = document.getElementById('summaryStrip');
+  const sm = d.summary;
+  strip.innerHTML =
+    `<span class="chip chip-mal">Malicious: ${sm.Malicious||0}</span>` +
+    `<span class="chip chip-sus">Suspicious: ${sm.Suspicious||0}</span>` +
+    `<span class="chip chip-cln">Clean: ${sm.Clean||0}</span>` +
+    `<span class="chip chip-und">Undetected: ${sm.Undetected||0}</span>`;
+
+  // indicators
+  const ul = document.getElementById('indicatorList');
+  ul.innerHTML = d.indicators.map(i => `<li>${i}</li>`).join('');
+
+  // vendors
+  allVendors = d.vendors;
+  filterVendors('all');
+
+  document.getElementById('results').style.display = 'block';
+}
+
+function filterVendors(f) {
+  document.querySelectorAll('#filterRow button').forEach(b => {
+    b.classList.toggle('active', b.dataset.f === f);
+  });
+  const list = f === 'all' ? allVendors : allVendors.filter(v => v.status === f);
+  const tbody = document.getElementById('vendorBody');
+  tbody.innerHTML = list.map((v, i) => {
+    const cls = v.status === 'Malicious' ? 'st-mal'
+              : v.status === 'Suspicious' ? 'st-sus'
+              : v.status === 'Clean' ? 'st-cln' : 'st-und';
+    return `<tr><td>${i+1}</td><td>${v.name}</td><td>${v.category}</td><td class="${cls}">${v.status}</td></tr>`;
+  }).join('');
+}
+
+document.getElementById('filterRow').addEventListener('click', e => {
+  if (e.target.dataset.f) filterVendors(e.target.dataset.f);
+});
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doScan();
+});
+</script>
+</body>
+</html>
